@@ -7,6 +7,10 @@
 
 using namespace sf;
 
+
+enum class GameState {Game, Menu};
+GameState state = GameState::Menu;
+
 void static showPetrol(int& petrol, Text& petrolText) {
     petrolText.setString("Petrol: " + std::to_string(petrol));
     petrolText.setPosition(10.f, 10.f);
@@ -122,6 +126,14 @@ int main() {
     petrolText.setCharacterSize(24);
     petrolText.setFillColor(Color::White);
 
+    Text startText("START", MyFont, 40);
+    startText.setFillColor(Color::White);
+    startText.setPosition(350, 200);
+
+    Text exitText("EXIT", MyFont, 40);
+    exitText.setFillColor(Color::White);
+    exitText.setPosition(360, 300);
+
     Sprite background(BackgroundTexture);
     background.setScale(
         WINDOW_WIDTH / (float) (BackgroundTexture.getSize().x),
@@ -133,167 +145,220 @@ int main() {
     ship.setOrigin(ShipTexture.getSize().x / 2.f, ShipTexture.getSize().y / 2.f);
     ship.setPosition(400.f, 300.f);
 
-    float speedShip = 5.f, speed = 5.f, scalePetrol = 0.15f;
+    float speedShip = 5.f, speed = 5.f, scalePetrol = 0.1f;
     std::vector<Sprite> asteroids;
     std::vector<Sprite> conisters;
     Clock spawnClock, timeSpawnAsteroidClock, timeScore, timeSpawnPetrol, timeDecreasePetrol;
     float timeSpawnAsteroid = 1.f;
-    bool gameOver = false;
+    bool gameOver = false, showMessage = false;
 
     while (window.isOpen()) {
         Event e;
         while (window.pollEvent(e)) {
-            if (e.type == Event::Closed)
+            if (e.type == Event::Closed) {
                 window.close();
-        }
-
-        if (!gameOver) {
-            // Управление кораблём
-            if (Keyboard::isKeyPressed(Keyboard::Up)) ship.move(0, -speedShip);
-            if (Keyboard::isKeyPressed(Keyboard::Down)) ship.move(0, speedShip);
-            if (Keyboard::isKeyPressed(Keyboard::Left)) ship.move(-speedShip, 0);
-            if (Keyboard::isKeyPressed(Keyboard::Right)) ship.move(speedShip, 0);
-
-            // Границы окна
-            FloatRect bounds = ship.getGlobalBounds();
-            if (bounds.left < 0) ship.setPosition(bounds.width / 2.f, ship.getPosition().y);
-            if (bounds.left + bounds.width > WINDOW_WIDTH) ship.setPosition(WINDOW_WIDTH - bounds.width / 2.f, ship.getPosition().y);
-            if (bounds.top < 0) ship.setPosition(ship.getPosition().x, bounds.height / 2.f);
-            if (bounds.top + bounds.height > WINDOW_HEIGHT) ship.setPosition(ship.getPosition().x, WINDOW_HEIGHT - bounds.height / 2.f);
-
-
-            // Спавн астероидов
-            if (spawnClock.getElapsedTime().asSeconds() > timeSpawnAsteroid) {
-                Sprite asteroid(asteroidTexture);
-
-                float scale = 0.15f + static_cast<float>(rand()) / RAND_MAX * 0.1f;
-                asteroid.setScale(scale, scale);
-
-                FloatRect localBounds = asteroid.getLocalBounds();
-                asteroid.setOrigin(localBounds.width / 2.f, localBounds.height / 2.f);
-
-                float posY = static_cast<float>(rand() % WINDOW_HEIGHT);
-                float halfHeight = (localBounds.height * scale) / 2.f;
-                if (posY < halfHeight) posY = halfHeight;
-                if (posY > WINDOW_HEIGHT - halfHeight) posY = WINDOW_HEIGHT - halfHeight;
-
-                asteroid.setPosition(WINDOW_WIDTH + (localBounds.width * scale) / 2.f, posY);
-                asteroids.push_back(asteroid);
-                spawnClock.restart();
             }
 
-            if (timeSpawnAsteroidClock.getElapsedTime().asSeconds() > 10.f) {
-                if (timeSpawnAsteroid > 0.5) {
-                    timeSpawnAsteroid -= 0.1f;
-                }
-                if (speed < 15) {
-                    speed += 1.f;
-                }
-                timeSpawnAsteroidClock.restart();
-            }
+            if (state == GameState::Menu) {
+                if (e.type == Event::MouseButtonPressed) {
+                    Vector2i mousePos = Mouse::getPosition(window);
 
-            // Движение астероидов
-            for (auto& a : asteroids) a.move(-speed, 0.f);
+                    if (startText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
+                        state = GameState::Game; 
+                        resetGame(ship,
+                            asteroids,
+                            spawnClock,
+                            timeSpawnAsteroidClock,
+                            timeScore,
+                            ShipTexture,
+                            score,
+                            scoreText,
+                            speed,
+                            timeSpawnPetrol,
+                            timeSpawnAsteroid,
+                            petrol,
+                            petrolText,
+                            timeDecreasePetrol);
 
-            asteroids.erase(
-                std::remove_if(asteroids.begin(), asteroids.end(),
-                    [](const Sprite& a) { return a.getPosition().x < -200.f; }),
-                asteroids.end()
-            );
+                        gameOver = false;
+                        showMessage = false;
+                    }
 
-            // Проверка столкновений
-            for (auto& a : asteroids) {
-                if (ship.getGlobalBounds().intersects(a.getGlobalBounds())) {
-                    SoundAsteroid.play();
-                    gameOver = true;
-                    break;
-                }
-            }
-
-            if (timeSpawnPetrol.getElapsedTime().asSeconds() > 5.f) {
-                Sprite conister(PetrolTexture);
-
-                conister.setScale(scalePetrol, scalePetrol);
-
-                FloatRect localBounds = conister.getLocalBounds();
-                conister.setOrigin(localBounds.width / 2.f, localBounds.height / 2.f);
-
-                float posY = static_cast<float>(rand() % WINDOW_HEIGHT);
-                float halfHeight = (localBounds.height * scalePetrol) / 2.f;
-                if (posY < halfHeight) posY = halfHeight;
-                if (posY > WINDOW_HEIGHT - halfHeight) posY = WINDOW_HEIGHT - halfHeight;
-
-                conister.setPosition(WINDOW_WIDTH + (localBounds.width * scalePetrol) / 2.f, posY);
-                conisters.push_back(conister);
-                timeSpawnPetrol.restart();
-            }
-
-            for (auto& a : conisters) {
-                a.move(-speed, 0);
-            }
-
-            conisters.erase(
-                std::remove_if(conisters.begin(), conisters.end(),
-                    [](const Sprite& a) { return a.getPosition().x < -200.f; }),
-                conisters.end()
-            );
-            
-            for (auto it = conisters.begin(); it != conisters.end();) {
-                if (ship.getGlobalBounds().intersects(it->getGlobalBounds())) {
-                    it = conisters.erase(it);
-                    petrol += 25;
-                    showPetrol(petrol, petrolText);
-                    SoundPetrol.play();
-                }
-                else {
-                    ++it;
-                }
-            }
-            
-
-            // Получаем размер текста
-            FloatRect textBounds = scoreText.getLocalBounds();
-
-            // Ставим позицию в правый верхний угол
-            scoreText.setPosition(
-                WINDOW_WIDTH - textBounds.width - 10.f, // окно шириной 800 → отнимаем ширину текста и небольшой отступ
-                10.f                             // 10 пикселей от верхнего края
-            );
-
-            if (timeScore.getElapsedTime().asSeconds() > 1.f) {
-                score += 100;
-                showScore(score, scoreText);
-                timeScore.restart();
-            }
-
-            petrolText.setPosition(10.f, 10.f);
-            if (timeDecreasePetrol.getElapsedTime().asSeconds() > 1.f) {
-                if (petrol > 0) {
-                    petrol -= 4;
-                    showPetrol(petrol, petrolText);
-                    timeDecreasePetrol.restart();
-                }
-                else {
-                    gameOver = true;
-                    break;
+                    if (exitText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
+                        window.close();
+                    }
                 }
             }
         }
 
-        // Рендер
+        window.clear(Color::Black);
+
+        if (state == GameState::Menu) {
+            window.draw(startText);
+            window.draw(exitText);
+        }
+        else if (state == GameState::Game) {
+            if (!gameOver) {
+                // Управление кораблём
+                if (Keyboard::isKeyPressed(Keyboard::Up)) ship.move(0, -speedShip);
+                if (Keyboard::isKeyPressed(Keyboard::Down)) ship.move(0, speedShip);
+                if (Keyboard::isKeyPressed(Keyboard::Left)) ship.move(-speedShip, 0);
+                if (Keyboard::isKeyPressed(Keyboard::Right)) ship.move(speedShip, 0);
+
+                // Границы окна
+                FloatRect bounds = ship.getGlobalBounds();
+                if (bounds.left < 0) ship.setPosition(bounds.width / 2.f, ship.getPosition().y);
+                if (bounds.left + bounds.width > WINDOW_WIDTH) ship.setPosition(WINDOW_WIDTH - bounds.width / 2.f, ship.getPosition().y);
+                if (bounds.top < 0) ship.setPosition(ship.getPosition().x, bounds.height / 2.f);
+                if (bounds.top + bounds.height > WINDOW_HEIGHT) ship.setPosition(ship.getPosition().x, WINDOW_HEIGHT - bounds.height / 2.f);
+
+
+                // Спавн астероидов
+                if (spawnClock.getElapsedTime().asSeconds() > timeSpawnAsteroid) {
+                    Sprite asteroid(asteroidTexture);
+
+                    float scale = 0.15f + static_cast<float>(rand()) / RAND_MAX * 0.1f;
+                    asteroid.setScale(scale, scale);
+
+                    FloatRect localBounds = asteroid.getLocalBounds();
+                    asteroid.setOrigin(localBounds.width / 2.f, localBounds.height / 2.f);
+
+                    float posY = static_cast<float>(rand() % WINDOW_HEIGHT);
+                    float halfHeight = (localBounds.height * scale) / 2.f;
+                    if (posY < halfHeight) posY = halfHeight;
+                    if (posY > WINDOW_HEIGHT - halfHeight) posY = WINDOW_HEIGHT - halfHeight;
+
+                    asteroid.setPosition(WINDOW_WIDTH + (localBounds.width * scale) / 2.f, posY);
+                    asteroids.push_back(asteroid);
+                    spawnClock.restart();
+                }
+
+                if (timeSpawnAsteroidClock.getElapsedTime().asSeconds() > 10.f) {
+                    if (timeSpawnAsteroid > 0.5) {
+                        timeSpawnAsteroid -= 0.1f;
+                    }
+                    if (speed < 15) {
+                        speed += 1.f;
+                    }
+                    timeSpawnAsteroidClock.restart();
+                }
+
+                // Движение астероидов
+                for (auto& a : asteroids) a.move(-speed, 0.f);
+
+                asteroids.erase(
+                    std::remove_if(asteroids.begin(), asteroids.end(),
+                        [](const Sprite& a) { return a.getPosition().x < -200.f; }),
+                    asteroids.end()
+                );
+
+                // Проверка столкновений
+                for (auto& a : asteroids) {
+                    if (ship.getGlobalBounds().intersects(a.getGlobalBounds())) {
+                        SoundAsteroid.play();
+                        gameOver = true;
+                    }
+                }
+
+                if (timeSpawnPetrol.getElapsedTime().asSeconds() > 5.f) {
+                    Sprite conister(PetrolTexture);
+
+                    conister.setScale(scalePetrol, scalePetrol);
+
+                    FloatRect localBounds = conister.getLocalBounds();
+                    conister.setOrigin(localBounds.width / 2.f, localBounds.height / 2.f);
+
+                    float posY = static_cast<float>(rand() % WINDOW_HEIGHT);
+                    float halfHeight = (localBounds.height * scalePetrol) / 2.f;
+                    if (posY < halfHeight) posY = halfHeight;
+                    if (posY > WINDOW_HEIGHT - halfHeight) posY = WINDOW_HEIGHT - halfHeight;
+
+                    conister.setPosition(WINDOW_WIDTH + (localBounds.width * scalePetrol) / 2.f, posY);
+                    conisters.push_back(conister);
+                    timeSpawnPetrol.restart();
+                }
+
+                for (auto& a : conisters) {
+                    a.move(-speed, 0);
+                }
+
+                conisters.erase(
+                    std::remove_if(conisters.begin(), conisters.end(),
+                        [](const Sprite& a) { return a.getPosition().x < -200.f; }),
+                    conisters.end()
+                );
+
+                for (auto it = conisters.begin(); it != conisters.end();) {
+                    if (ship.getGlobalBounds().intersects(it->getGlobalBounds())) {
+                        it = conisters.erase(it);
+                        petrol += 25;
+                        showPetrol(petrol, petrolText);
+                        SoundPetrol.play();
+                    }
+                    else {
+                        ++it;
+                    }
+                }
+
+
+                // Получаем размер текста
+                FloatRect textBounds = scoreText.getLocalBounds();
+
+                // Ставим позицию в правый верхний угол
+                scoreText.setPosition(
+                    WINDOW_WIDTH - textBounds.width - 10.f, 
+                    10.f                           
+                );
+
+                if (timeScore.getElapsedTime().asSeconds() > 1.f) {
+                    score += 100;
+                    showScore(score, scoreText);
+                    timeScore.restart();
+                }
+
+                petrolText.setPosition(10.f, 10.f);
+                if (timeDecreasePetrol.getElapsedTime().asSeconds() > 1.f) {
+                    if (petrol > 0) {
+                        petrol -= 4;
+                        showPetrol(petrol, petrolText);
+                        timeDecreasePetrol.restart();
+                    }
+                    else {
+                        gameOver = true;
+                    }
+                }
+            }
+        }
+
         window.clear();
-        window.draw(background);
-        window.draw(ship);
-        window.draw(scoreText);
-        window.draw(petrolText);
-        for (auto& a : asteroids) window.draw(a);
-        for (auto& a : conisters) window.draw(a);
-        window.display();
+        if (state == GameState::Menu) {
+            window.draw(startText);
+            window.draw(exitText);
+        }
+        else if (state == GameState::Game) {
+            window.draw(background);
+            window.draw(ship);
+            window.draw(scoreText);
+            window.draw(petrolText);
+            for (auto& a : asteroids) window.draw(a);
+            for (auto& c : conisters) window.draw(c);
+            if (gameOver) {
+                Text overText("GAME OVER", MyFont, 48);
+                overText.setFillColor(Color::Red);
+                FloatRect tb = overText.getLocalBounds();
+                overText.setPosition(WINDOW_WIDTH / 2.f - tb.width / 2.f, WINDOW_HEIGHT / 2.f - tb.height / 2.f);
+                window.draw(overText);
+            }
+        }
 
-        // Если столкновение, показываем окно и сбрасываем игру
-        if (gameOver) {
-            int result = MessageBox(NULL, L"Вы столкнулись! Начать заново?", L"Game Over", MB_OKCANCEL | MB_ICONEXCLAMATION);
+        window.display(); // только здес
+
+        if (state == GameState::Game && gameOver && !showMessage) {
+            showMessage = true; 
+            std::wstring msg = L"Вы столкнулись!\nСчёт: " + std::to_wstring(score) + L"\nНачать заново?";
+            int result = MessageBox(NULL, msg.c_str(), L"Game Over", MB_OKCANCEL | MB_ICONEXCLAMATION);
             if (result == IDOK) {
+                // сбрасываем игру (включая текст)
                 resetGame(ship,
                     asteroids,
                     spawnClock,
@@ -308,11 +373,11 @@ int main() {
                     petrol,
                     petrolText,
                     timeDecreasePetrol);
-
                 gameOver = false;
+                showMessage = false; // можно снова показывать в будущем
             }
             else {
-                window.close();
+                state = GameState::Menu;
             }
         }
     }
