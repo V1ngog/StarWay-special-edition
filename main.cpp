@@ -238,7 +238,7 @@ int main() {
             for (int i = 0; i < 3; ++i) {
                 Text t(std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
                 t.setFillColor(Color::Yellow);
-                t.setPosition(300.f, 180.f + i * 40.f);
+                t.setPosition(10.f, 10.f + i * 40.f);
                 window.draw(t);
             }
             window.draw(exitFromLeaderBoard);
@@ -388,7 +388,7 @@ int main() {
             for (int i = 0; i < 3; ++i) {
                 sf::Text t(" " + std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
                 t.setFillColor(sf::Color::Yellow);
-                t.setPosition(300.f, 180.f + i * 40.f);
+                t.setPosition(10.f, 10.f + i * 40.f);
                 leaderboardTexts.push_back(t);
             }
             window.draw(exitFromLeaderBoard);
