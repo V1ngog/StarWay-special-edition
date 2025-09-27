@@ -4,12 +4,40 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
+#include <algorithm>
 
 using namespace sf;
 
 
-enum class GameState {Game, Menu};
+enum class GameState {Game, Menu, LeaderBoard};
 GameState state = GameState::Menu;
+
+std::vector<int> loadBestScores() {
+    std::vector<int> scores;
+    std::ifstream file("save.txt");
+    int value;
+    while (file >> value) {
+        scores.push_back(value);
+    }
+
+    // Сортируем по убыванию (чтобы первые элементы были наибольшими)
+    std::sort(scores.begin(), scores.end(), std::greater<int>());
+
+    // Убедимся, что длина вектора ровно 3 (если меньше — дополним нулями)
+    while (scores.size() < 3) scores.push_back(0);
+    if (scores.size() > 3) scores.resize(3);
+
+    return scores;
+}
+
+// Сохраняет первые 3 значения из scores в файл (каждое значение — с новой строки)
+void saveBestScores(const std::vector<int>& scores) {
+    std::ofstream file("save.txt", std::ios::trunc);
+    for (size_t i = 0; i < scores.size() && i < 3; ++i) {
+        file << scores[i] << "\n";
+    }
+}
 
 void static showPetrol(int& petrol, Text& petrolText) {
     petrolText.setString("Petrol: " + std::to_string(petrol));
@@ -60,10 +88,11 @@ int main() {
 
     const int WINDOW_WIDTH = 800, WINDOW_HEIGHT = 600;
     int score = 0, petrol = 100;
+    std::vector<int> bestScores = loadBestScores();
     RenderWindow window(VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Star Way");
     window.setFramerateLimit(60);
 
-    srand( (unsigned) (time(0)));
+    srand((unsigned)(time(0)));
 
     // Загрузка текстур
     Texture ShipTexture;
@@ -132,12 +161,21 @@ int main() {
 
     Text exitText("EXIT", MyFont, 40);
     exitText.setFillColor(Color::White);
-    exitText.setPosition(360, 300);
+    exitText.setPosition(360, 400);
+
+    Text leaderText("LEADERBOARD", MyFont, 40);
+    leaderText.setFillColor(Color::White);
+    leaderText.setPosition(260, 300);
+
+    Text exitFromLeaderBoard("exit", MyFont, 20);
+    exitFromLeaderBoard.setFillColor(Color::White);
+    exitFromLeaderBoard.setPosition(750, 570);
+
 
     Sprite background(BackgroundTexture);
     background.setScale(
-        WINDOW_WIDTH / (float) (BackgroundTexture.getSize().x),
-        WINDOW_HEIGHT / (float) (BackgroundTexture.getSize().y)
+        WINDOW_WIDTH / (float)(BackgroundTexture.getSize().x),
+        WINDOW_HEIGHT / (float)(BackgroundTexture.getSize().y)
     );
 
     Sprite ship(ShipTexture);
@@ -159,34 +197,31 @@ int main() {
                 window.close();
             }
 
-            if (state == GameState::Menu) {
-                if (e.type == Event::MouseButtonPressed) {
-                    Vector2i mousePos = Mouse::getPosition(window);
+            if (state == GameState::Menu && e.type == Event::MouseButtonPressed) {
+                Vector2i mousePos = Mouse::getPosition(window);
 
-                    if (startText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
-                        state = GameState::Game; 
-                        resetGame(ship,
-                            asteroids,
-                            spawnClock,
-                            timeSpawnAsteroidClock,
-                            timeScore,
-                            ShipTexture,
-                            score,
-                            scoreText,
-                            speed,
-                            timeSpawnPetrol,
-                            timeSpawnAsteroid,
-                            petrol,
-                            petrolText,
-                            timeDecreasePetrol);
+                if (startText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
+                    state = GameState::Game;
+                    resetGame(ship, asteroids, spawnClock, timeSpawnAsteroidClock,
+                        timeScore, ShipTexture, score, scoreText, speed,
+                        timeSpawnPetrol, timeSpawnAsteroid, petrol, petrolText, timeDecreasePetrol);
+                    gameOver = false;
+                    showMessage = false;
+                }
 
-                        gameOver = false;
-                        showMessage = false;
-                    }
+                if (leaderText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
+                    state = GameState::LeaderBoard;
+                }
 
-                    if (exitText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
-                        window.close();
-                    }
+                if (exitText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
+                    window.close();
+                }
+            }
+
+            if (state == GameState::LeaderBoard && e.type == Event::MouseButtonPressed) {
+                Vector2i mousePos = Mouse::getPosition(window);
+                if (exitFromLeaderBoard.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
+                    state = GameState::Menu;
                 }
             }
         }
@@ -196,7 +231,19 @@ int main() {
         if (state == GameState::Menu) {
             window.draw(startText);
             window.draw(exitText);
+            window.draw(leaderText);
         }
+
+        else if (state == GameState::LeaderBoard) {
+            for (int i = 0; i < 3; ++i) {
+                Text t(std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
+                t.setFillColor(Color::Yellow);
+                t.setPosition(300.f, 180.f + i * 40.f);
+                window.draw(t);
+            }
+            window.draw(exitFromLeaderBoard);
+        }
+
         else if (state == GameState::Game) {
             if (!gameOver) {
                 // Управление кораблём
@@ -306,8 +353,8 @@ int main() {
 
                 // Ставим позицию в правый верхний угол
                 scoreText.setPosition(
-                    WINDOW_WIDTH - textBounds.width - 10.f, 
-                    10.f                           
+                    WINDOW_WIDTH - textBounds.width - 10.f,
+                    10.f
                 );
 
                 if (timeScore.getElapsedTime().asSeconds() > 1.f) {
@@ -330,11 +377,23 @@ int main() {
             }
         }
 
-        window.clear();
         if (state == GameState::Menu) {
             window.draw(startText);
             window.draw(exitText);
+            window.draw(leaderText);
         }
+
+        else if (state == GameState::LeaderBoard) {
+            std::vector<sf::Text> leaderboardTexts;
+            for (int i = 0; i < 3; ++i) {
+                sf::Text t(" " + std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
+                t.setFillColor(sf::Color::Yellow);
+                t.setPosition(300.f, 180.f + i * 40.f);
+                leaderboardTexts.push_back(t);
+            }
+            window.draw(exitFromLeaderBoard);
+        }
+
         else if (state == GameState::Game) {
             window.draw(background);
             window.draw(ship);
@@ -351,14 +410,20 @@ int main() {
             }
         }
 
-        window.display(); // только здес
+        window.display();
 
         if (state == GameState::Game && gameOver && !showMessage) {
-            showMessage = true; 
+            showMessage = true;
+
+            bestScores.push_back(score);
+            std::sort(bestScores.begin(), bestScores.end(), std::greater<int>());
+            if (bestScores.size() > 3) bestScores.resize(3);
+
+            saveBestScores(bestScores);
+
             std::wstring msg = L"Вы столкнулись!\nСчёт: " + std::to_wstring(score) + L"\nНачать заново?";
             int result = MessageBox(NULL, msg.c_str(), L"Game Over", MB_OKCANCEL | MB_ICONEXCLAMATION);
             if (result == IDOK) {
-                // сбрасываем игру (включая текст)
                 resetGame(ship,
                     asteroids,
                     spawnClock,
