@@ -7,7 +7,17 @@
 
 using namespace sf;
 
-// Функция для сброса игры
+void static showPetrol(int& petrol, Text& petrolText) {
+    petrolText.setString("Petrol: " + std::to_string(petrol));
+    petrolText.setPosition(10.f, 10.f);
+}
+
+void static showScore(int& score, Text& scoreText) {
+    scoreText.setString("Score: " + std::to_string(score));
+    FloatRect textBounds = scoreText.getLocalBounds();
+    scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
+}
+
 void static resetGame(Sprite& ship,
     std::vector<Sprite>& asteroids,
     Clock& spawnClock,
@@ -35,19 +45,11 @@ void static resetGame(Sprite& ship,
     petrol = 100;
     timeDecreasePetrol.restart();
 
-    scoreText.setString("Score: " + std::to_string(score));
-    FloatRect textBounds = scoreText.getLocalBounds();
-    scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
-
-    petrolText.setString("Petrol: " + std::to_string(petrol));
-    petrolText.setPosition(10.f, 10.f);
+    showScore(score, scoreText);
+    showPetrol(petrol, petrolText);
 
 }
 
-void static showPetrol(int& petrol, Text& petrolText) {
-    petrolText.setString("Petrol: " + std::to_string(petrol));
-    petrolText.setPosition(10.f, 10.f);
-}
 
 int main() {
     setlocale(LC_ALL, "RU");
@@ -260,9 +262,7 @@ int main() {
 
             if (timeScore.getElapsedTime().asSeconds() > 1.f) {
                 score += 100;
-                scoreText.setString("Score: " + std::to_string(score));
-                FloatRect textBounds = scoreText.getLocalBounds();
-                scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
+                showScore(score, scoreText);
                 timeScore.restart();
             }
 
