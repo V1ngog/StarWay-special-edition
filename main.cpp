@@ -1,4 +1,5 @@
 ﻿#include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <windows.h>
 #include <vector>
 #include <cstdlib>
@@ -14,7 +15,13 @@ void static resetGame(Sprite& ship,
     Clock& timeScore,
     const Texture& ShipTexture,
     int& score,
-    Text& scoreText) {
+    Text& scoreText,
+    float& speed,
+    Clock& timeSpawnPetrol,
+    float& timeSpawnAsteroid,
+    int& petrol,
+    Text& petrolText,
+    Clock& timeDecreasePetrol) {
 
     ship.setPosition(400.f, 300.f);
     asteroids.clear();
@@ -22,21 +29,35 @@ void static resetGame(Sprite& ship,
     timeSpawnAsteroidClock.restart();
     timeScore.restart();
     score = 0;
+    speed = 5.f;
+    timeSpawnPetrol.restart();
+    timeSpawnAsteroid = 1.f;
+    petrol = 100;
+    timeDecreasePetrol.restart();
 
     scoreText.setString("Score: " + std::to_string(score));
     FloatRect textBounds = scoreText.getLocalBounds();
     scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
+
+    petrolText.setString("Petrol: " + std::to_string(petrol));
+    petrolText.setPosition(10.f, 10.f);
+
+}
+
+void static showPetrol(int& petrol, Text& petrolText) {
+    petrolText.setString("Petrol: " + std::to_string(petrol));
+    petrolText.setPosition(10.f, 10.f);
 }
 
 int main() {
     setlocale(LC_ALL, "RU");
 
     const int WINDOW_WIDTH = 800, WINDOW_HEIGHT = 600;
-    int score = 0;
+    int score = 0, petrol = 100;
     RenderWindow window(VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Star Way");
     window.setFramerateLimit(60);
 
-    srand(static_cast<unsigned>(time(0)));
+    srand( (unsigned) (time(0)));
 
     // Загрузка текстур
     Texture ShipTexture;
@@ -57,22 +78,52 @@ int main() {
         return -1;
     }
 
-    Font MyFont;
-    if (!MyFont.loadFromFile("font/myfont.ttf")) {
-        MessageBox(NULL, L"Не удалось загрузить картинку астероида!", L"Ошибка", MB_OK | MB_ICONERROR);
+    Texture PetrolTexture;
+    if (!PetrolTexture.loadFromFile("image/petrol.png")) {
+        MessageBox(NULL, L"Не удалось загрузить картинку конистры!", L"Ошибка", MB_OK | MB_ICONERROR);
         return -1;
     }
+
+    Font MyFont;
+    if (!MyFont.loadFromFile("font/myfont.ttf")) {
+        MessageBox(NULL, L"Не удалось загрузить шрифт!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return -1;
+    }
+
+    SoundBuffer SoundPetrolBuff;
+    Sound SoundPetrol;
+
+    if (!SoundPetrolBuff.loadFromFile("sound/petrol.wav")) {
+        MessageBox(NULL, L"Не удалось загрузить звук конистры!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return -1;
+    }
+
+    SoundBuffer SoundAsteroidBuff;
+    Sound SoundAsteroid;
+    if (!SoundAsteroidBuff.loadFromFile("sound/laugh.wav")) {
+        MessageBox(NULL, L"Не удалось загрузить звук астероида!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return -1;
+    }
+
+    SoundAsteroid.setBuffer(SoundAsteroidBuff);
+    SoundPetrol.setBuffer(SoundPetrolBuff);
 
     Text scoreText;
     scoreText.setFont(MyFont);
     scoreText.setString("Score: " + std::to_string(score));
     scoreText.setCharacterSize(24);
-    scoreText.setFillColor(sf::Color::White);
+    scoreText.setFillColor(Color::White);
+
+    Text petrolText;
+    petrolText.setFont(MyFont);
+    petrolText.setString("Petrol: " + std::to_string(petrol));
+    petrolText.setCharacterSize(24);
+    petrolText.setFillColor(Color::White);
 
     Sprite background(BackgroundTexture);
     background.setScale(
-        WINDOW_WIDTH / static_cast<float>(BackgroundTexture.getSize().x),
-        WINDOW_HEIGHT / static_cast<float>(BackgroundTexture.getSize().y)
+        WINDOW_WIDTH / (float) (BackgroundTexture.getSize().x),
+        WINDOW_HEIGHT / (float) (BackgroundTexture.getSize().y)
     );
 
     Sprite ship(ShipTexture);
@@ -80,9 +131,10 @@ int main() {
     ship.setOrigin(ShipTexture.getSize().x / 2.f, ShipTexture.getSize().y / 2.f);
     ship.setPosition(400.f, 300.f);
 
-    float speed = 5.f;
+    float speedShip = 5.f, speed = 5.f, scalePetrol = 0.15f;
     std::vector<Sprite> asteroids;
-    Clock spawnClock, timeSpawnAsteroidClock, timeScore;
+    std::vector<Sprite> conisters;
+    Clock spawnClock, timeSpawnAsteroidClock, timeScore, timeSpawnPetrol, timeDecreasePetrol;
     float timeSpawnAsteroid = 1.f;
     bool gameOver = false;
 
@@ -95,10 +147,10 @@ int main() {
 
         if (!gameOver) {
             // Управление кораблём
-            if (Keyboard::isKeyPressed(Keyboard::Up)) ship.move(0, -speed);
-            if (Keyboard::isKeyPressed(Keyboard::Down)) ship.move(0, speed);
-            if (Keyboard::isKeyPressed(Keyboard::Left)) ship.move(-speed, 0);
-            if (Keyboard::isKeyPressed(Keyboard::Right)) ship.move(speed, 0);
+            if (Keyboard::isKeyPressed(Keyboard::Up)) ship.move(0, -speedShip);
+            if (Keyboard::isKeyPressed(Keyboard::Down)) ship.move(0, speedShip);
+            if (Keyboard::isKeyPressed(Keyboard::Left)) ship.move(-speedShip, 0);
+            if (Keyboard::isKeyPressed(Keyboard::Right)) ship.move(speedShip, 0);
 
             // Границы окна
             FloatRect bounds = ship.getGlobalBounds();
@@ -111,8 +163,10 @@ int main() {
             // Спавн астероидов
             if (spawnClock.getElapsedTime().asSeconds() > timeSpawnAsteroid) {
                 Sprite asteroid(asteroidTexture);
+
                 float scale = 0.15f + static_cast<float>(rand()) / RAND_MAX * 0.1f;
                 asteroid.setScale(scale, scale);
+
                 FloatRect localBounds = asteroid.getLocalBounds();
                 asteroid.setOrigin(localBounds.width / 2.f, localBounds.height / 2.f);
 
@@ -127,14 +181,17 @@ int main() {
             }
 
             if (timeSpawnAsteroidClock.getElapsedTime().asSeconds() > 10.f) {
-                if (timeSpawnAsteroid > 0.3) {
+                if (timeSpawnAsteroid > 0.5) {
                     timeSpawnAsteroid -= 0.1f;
-                    timeSpawnAsteroidClock.restart();
                 }
+                if (speed < 15) {
+                    speed += 1.f;
+                }
+                timeSpawnAsteroidClock.restart();
             }
 
             // Движение астероидов
-            for (auto& a : asteroids) a.move(-5.f, 0.f);
+            for (auto& a : asteroids) a.move(-speed, 0.f);
 
             asteroids.erase(
                 std::remove_if(asteroids.begin(), asteroids.end(),
@@ -145,10 +202,52 @@ int main() {
             // Проверка столкновений
             for (auto& a : asteroids) {
                 if (ship.getGlobalBounds().intersects(a.getGlobalBounds())) {
+                    SoundAsteroid.play();
                     gameOver = true;
                     break;
                 }
             }
+
+            if (timeSpawnPetrol.getElapsedTime().asSeconds() > 5.f) {
+                Sprite conister(PetrolTexture);
+
+                conister.setScale(scalePetrol, scalePetrol);
+
+                FloatRect localBounds = conister.getLocalBounds();
+                conister.setOrigin(localBounds.width / 2.f, localBounds.height / 2.f);
+
+                float posY = static_cast<float>(rand() % WINDOW_HEIGHT);
+                float halfHeight = (localBounds.height * scalePetrol) / 2.f;
+                if (posY < halfHeight) posY = halfHeight;
+                if (posY > WINDOW_HEIGHT - halfHeight) posY = WINDOW_HEIGHT - halfHeight;
+
+                conister.setPosition(WINDOW_WIDTH + (localBounds.width * scalePetrol) / 2.f, posY);
+                conisters.push_back(conister);
+                timeSpawnPetrol.restart();
+            }
+
+            for (auto& a : conisters) {
+                a.move(-speed, 0);
+            }
+
+            conisters.erase(
+                std::remove_if(conisters.begin(), conisters.end(),
+                    [](const Sprite& a) { return a.getPosition().x < -200.f; }),
+                conisters.end()
+            );
+            
+            for (auto it = conisters.begin(); it != conisters.end();) {
+                if (ship.getGlobalBounds().intersects(it->getGlobalBounds())) {
+                    it = conisters.erase(it);
+                    petrol += 25;
+                    showPetrol(petrol, petrolText);
+                    SoundPetrol.play();
+                }
+                else {
+                    ++it;
+                }
+            }
+            
 
             // Получаем размер текста
             FloatRect textBounds = scoreText.getLocalBounds();
@@ -166,6 +265,19 @@ int main() {
                 scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
                 timeScore.restart();
             }
+
+            petrolText.setPosition(10.f, 10.f);
+            if (timeDecreasePetrol.getElapsedTime().asSeconds() > 1.f) {
+                if (petrol > 0) {
+                    petrol -= 4;
+                    showPetrol(petrol, petrolText);
+                    timeDecreasePetrol.restart();
+                }
+                else {
+                    gameOver = true;
+                    break;
+                }
+            }
         }
 
         // Рендер
@@ -173,7 +285,9 @@ int main() {
         window.draw(background);
         window.draw(ship);
         window.draw(scoreText);
+        window.draw(petrolText);
         for (auto& a : asteroids) window.draw(a);
+        for (auto& a : conisters) window.draw(a);
         window.display();
 
         // Если столкновение, показываем окно и сбрасываем игру
@@ -187,7 +301,13 @@ int main() {
                     timeScore,
                     ShipTexture,
                     score,
-                    scoreText);
+                    scoreText,
+                    speed,
+                    timeSpawnPetrol,
+                    timeSpawnAsteroid,
+                    petrol,
+                    petrolText,
+                    timeDecreasePetrol);
 
                 gameOver = false;
             }
