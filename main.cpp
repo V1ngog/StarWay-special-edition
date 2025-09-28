@@ -51,17 +51,22 @@ void static showScore(int& score, Text& scoreText) {
     scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
 }
 
-//void printText(String& text,
-//    Text& name,
-//    Font& MyFont,
-//    int& size,
-//    int& posX,
-//    int& posY) {
-//
-//    Text name(text, MyFont, size);
-//    name.setFillColor(Color::White);
-//    name.setPosition(posX, posY);
-//
+// Создание спрайта с центровкой и масштабированием(Жаль что я сначала пишу потом думаю)
+//Sprite createSprite(const Texture& texture, float scale, float posX, float posY) {
+//    Sprite s(texture);                     
+//    s.setScale(scale, scale);              
+//    FloatRect bounds = s.getLocalBounds();  
+//    s.setOrigin(bounds.width / 2.f, bounds.height / 2.f); 
+//    s.setPosition(posX, posY);             
+//    return s;                               
+//}
+
+// Создание текста ( жаль я только щас допёр что так можно(((( )
+//Text createText(const std::string& str, Font& font, unsigned int size, Color color, float x, float y) {
+//    Text t(str, font, size);
+//    t.setFillColor(color);
+//    t.setPosition(x, y);
+//    return t;
 //}
 
 // Сброс игры
