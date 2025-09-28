@@ -92,6 +92,7 @@ void resetGame(
     sf::Clock& timeDecreasePetrol,
     float& intTimeSpawnBullet,
     float& intTimeDecreasePetrol,
+    float& intTimeScore,
     int& numberBullet,
     sf::Text& bulletText
 ) {
@@ -117,6 +118,7 @@ void resetGame(
     petrol = 100;
     intTimeSpawnBullet = 5.f;
     intTimeDecreasePetrol = 1.f;
+    intTimeScore = 1.f;
     numberBullet = 5;
 
     // обновляем тексты
@@ -272,7 +274,7 @@ int main() {
     std::vector<Sprite> conisters;
     std::vector<Sprite> bullets;
     Clock spawnClock, timeSpawnAsteroidClock, timeScore, timeSpawnPetrol, timeDecreasePetrol, timeSpawnBullet;
-    float timeSpawnAsteroid = 1.f, intTimeSpawnBullet = 5.f, intTimeDecreasePetrol = 1.f;
+    float timeSpawnAsteroid = 1.f, intTimeSpawnBullet = 5.f, intTimeDecreasePetrol = 1.f, intTimeScore = 1.f;
     bool gameOver = false, showMessage = false;
     std::string inputBuffer;
 
@@ -305,6 +307,12 @@ int main() {
 
                     inputBuffer.clear();
                 }
+
+                if (inputBuffer.find("scoreinf") != std::string::npos) {
+                    intTimeScore = 0.f;
+
+                    inputBuffer.clear();
+                }
             }
 			// Menu mouse events
             if (state == GameState::Menu && e.type == Event::MouseButtonPressed) {
@@ -330,6 +338,7 @@ int main() {
                         timeDecreasePetrol,
                         intTimeSpawnBullet,
                         intTimeDecreasePetrol,
+                        intTimeScore,
                         numberBullet,
                         bulletText
                     );
@@ -566,7 +575,7 @@ int main() {
                 );
 
 				// Обновление счёта
-                if (timeScore.getElapsedTime().asSeconds() > 1.f) {
+                if (timeScore.getElapsedTime().asSeconds() > intTimeScore) {
                     score += 100;
                     showScore(score, scoreText);
                     timeScore.restart();
@@ -673,6 +682,7 @@ int main() {
                     timeDecreasePetrol,
                     intTimeSpawnBullet,
                     intTimeDecreasePetrol,
+                    intTimeScore,
                     numberBullet,
                     bulletText
                 );
