@@ -9,10 +9,11 @@
 
 using namespace sf;
 
-
+// Состояния игры
 enum class GameState {Game, Menu, LeaderBoard, Paused};
 GameState state = GameState::Menu;
 
+// Загрузка лучших результатов
 std::vector<int> loadBestScores() {
     std::vector<int> scores;
     std::ifstream file("save.txt");
@@ -29,6 +30,7 @@ std::vector<int> loadBestScores() {
     return scores;
 }
 
+// Сохранение лучших результатов
 void saveBestScores(const std::vector<int>& scores) {
     std::ofstream file("save.txt", std::ios::trunc);
     for (size_t i = 0; i < scores.size() && i < 3; ++i) {
@@ -36,11 +38,13 @@ void saveBestScores(const std::vector<int>& scores) {
     }
 }
 
+// Обновление текста топлива
 void static showPetrol(int& petrol, Text& petrolText) {
     petrolText.setString("Petrol: " + std::to_string(petrol));
     petrolText.setPosition(10.f, 10.f);
 }
 
+// Обновление текста счёта
 void static showScore(int& score, Text& scoreText) {
     scoreText.setString("Score: " + std::to_string(score));
     FloatRect textBounds = scoreText.getLocalBounds();
@@ -59,6 +63,8 @@ void static showScore(int& score, Text& scoreText) {
 //    name.setPosition(posX, posY);
 //
 //}
+
+// Сброс игры
 void static resetGame(Sprite& ship,
     std::vector<Sprite>& asteroids,
     Clock& spawnClock,
@@ -95,12 +101,14 @@ void static resetGame(Sprite& ship,
 int main() {
     setlocale(LC_ALL, "RU");
 
+	// Создание окна
     const int WINDOW_WIDTH = 800, WINDOW_HEIGHT = 600;
     int score = 0, petrol = 100;
     std::vector<int> bestScores = loadBestScores();
     RenderWindow window(VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Star Way");
     window.setFramerateLimit(60);
 
+	// Инициализация рандома
     srand((unsigned)(time(0)));
 
     // Загрузка текстур
@@ -128,12 +136,14 @@ int main() {
         return -1;
     }
 
+	// Загрузка шрифта
     Font MyFont;
     if (!MyFont.loadFromFile("font/myfont.ttf")) {
         MessageBox(NULL, L"Не удалось загрузить шрифт!", L"Ошибка", MB_OK | MB_ICONERROR);
         return -1;
     }
 
+	// Загрузка звуков
     SoundBuffer SoundPetrolBuff;
     Sound SoundPetrol;
 
@@ -152,6 +162,7 @@ int main() {
     SoundAsteroid.setBuffer(SoundAsteroidBuff);
     SoundPetrol.setBuffer(SoundPetrolBuff);
 
+	// Создание текста
     Text scoreText;
     scoreText.setFont(MyFont);
     scoreText.setString("Score: " + std::to_string(score));
@@ -195,6 +206,7 @@ int main() {
         (WINDOW_HEIGHT / 2.f - tb.height / 2.f) + tb.height + 20.f
     );
 
+	// Создание спрайтов
     Sprite background(BackgroundTexture);
     background.setScale(
         WINDOW_WIDTH / (float)(BackgroundTexture.getSize().x),
@@ -205,6 +217,7 @@ int main() {
     ship.setScale(0.2f, 0.2f);
     ship.setOrigin(ShipTexture.getSize().x / 2.f, ShipTexture.getSize().y / 2.f);
     ship.setPosition(400.f, 300.f);
+   
 
     float speedShip = 5.f, speed = 5.f, scalePetrol = 0.1f;
     std::vector<Sprite> asteroids;
@@ -213,6 +226,7 @@ int main() {
     float timeSpawnAsteroid = 1.f;
     bool gameOver = false, showMessage = false;
 
+	// Главный цикл
     while (window.isOpen()) {
         Event e;
         while (window.pollEvent(e)) {
@@ -220,6 +234,7 @@ int main() {
                 window.close();
             }
 
+			// Menu mouse events
             if (state == GameState::Menu && e.type == Event::MouseButtonPressed) {
                 Vector2i mousePos = Mouse::getPosition(window);
 
@@ -241,6 +256,7 @@ int main() {
                 }
             }
 
+			// Leaderboard menu mouse events
             if (state == GameState::LeaderBoard && e.type == Event::MouseButtonPressed) {
                 Vector2i mousePos = Mouse::getPosition(window);
                 if (exitFromLeaderBoard.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
@@ -248,6 +264,7 @@ int main() {
                 }
             }
 
+			// Paused menu key events
             if (state == GameState::Game && e.type == Event::KeyPressed && e.key.code == Keyboard::Escape) {
                 state = GameState::Paused;
             }
@@ -256,6 +273,7 @@ int main() {
                 state = GameState::Game;
             }
 
+			// Paused menu mouse events
             if (state == GameState::Paused && e.type == Event::MouseButtonPressed) {
                 Vector2i mousePos = Mouse::getPosition(window);
 
@@ -267,13 +285,8 @@ int main() {
 
         window.clear(Color::Black);
 
-        if (state == GameState::Menu) {
-            window.draw(startText);
-            window.draw(exitText);
-            window.draw(leaderText);
-        }
-
-        else if (state == GameState::LeaderBoard) {
+		// Меню логика
+        if (state == GameState::LeaderBoard) {
             std::vector<sf::Text> leaderboardTexts;
             for (int i = 0; i < 3; ++i) {
                 sf::Text t(" " + std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
@@ -284,6 +297,7 @@ int main() {
             window.draw(exitFromLeaderBoard);
         }
 
+		// Игровой процесс логика
         else if (state == GameState::Game) {
             if (!gameOver) {
                 // Управление кораблём
@@ -320,6 +334,7 @@ int main() {
                     spawnClock.restart();
                 }
 
+				// Увеличение сложности
                 if (timeSpawnAsteroidClock.getElapsedTime().asSeconds() > 10.f) {
                     if (timeSpawnAsteroid > 0.5) {
                         timeSpawnAsteroid -= 0.1f;
@@ -347,6 +362,7 @@ int main() {
                     }
                 }
 
+				// Спавн канистр
                 if (timeSpawnPetrol.getElapsedTime().asSeconds() > 5.f) {
                     Sprite conister(PetrolTexture);
 
@@ -365,16 +381,19 @@ int main() {
                     timeSpawnPetrol.restart();
                 }
 
+				// Движение канистр
                 for (auto& a : conisters) {
                     a.move(-speed, 0);
                 }
 
+				// Удаление канистр за пределами экрана
                 conisters.erase(
                     std::remove_if(conisters.begin(), conisters.end(),
                         [](const Sprite& a) { return a.getPosition().x < -200.f; }),
                     conisters.end()
                 );
 
+				// Проверка столкновений с канистрами
                 for (auto it = conisters.begin(); it != conisters.end();) {
                     if (ship.getGlobalBounds().intersects(it->getGlobalBounds())) {
                         it = conisters.erase(it);
@@ -387,22 +406,21 @@ int main() {
                     }
                 }
 
-
-                // Получаем размер текста
+				// Обновление позиции счёта
                 FloatRect textBounds = scoreText.getLocalBounds();
-
-                // Ставим позицию в правый верхний угол
                 scoreText.setPosition(
                     WINDOW_WIDTH - textBounds.width - 10.f,
                     10.f
                 );
 
+				// Обновление счёта
                 if (timeScore.getElapsedTime().asSeconds() > 1.f) {
                     score += 100;
                     showScore(score, scoreText);
                     timeScore.restart();
                 }
 
+				// Отображение топлива и уменьшение его
                 petrolText.setPosition(10.f, 10.f);
                 if (timeDecreasePetrol.getElapsedTime().asSeconds() > 1.f) {
                     if (petrol > 0) {
@@ -417,12 +435,14 @@ int main() {
             }
         }
 
+		// Меню отрисовка
         if (state == GameState::Menu) {
             window.draw(startText);
             window.draw(exitText);
             window.draw(leaderText);
         }
 
+		// Таблица рекордов отрисовка
         else if (state == GameState::LeaderBoard) {
             for (int i = 0; i < 3; ++i) {
                 Text t(std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
@@ -433,6 +453,7 @@ int main() {
             window.draw(exitFromLeaderBoard);
         }
 
+		// Игровой процесс отрисовка
         else if (state == GameState::Game) {
             window.draw(background);
             window.draw(ship);
@@ -449,6 +470,7 @@ int main() {
             }
         }
 
+		// Paused
         else if (state == GameState::Paused) {
             window.draw(background);
             window.draw(ship);
@@ -463,6 +485,8 @@ int main() {
 
         window.display();
 
+        // Обработка окончания игры
+		// Чтобы MessageBox не появлялся несколько раз
         if (state == GameState::Game && gameOver && !showMessage) {
             showMessage = true;
 
@@ -490,7 +514,7 @@ int main() {
                     petrolText,
                     timeDecreasePetrol);
                 gameOver = false;
-                showMessage = false; // можно снова показывать в будущем
+                showMessage = false;
             }
             else {
                 state = GameState::Menu;
