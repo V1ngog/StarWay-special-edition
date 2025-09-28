@@ -10,7 +10,7 @@
 using namespace sf;
 
 
-enum class GameState {Game, Menu, LeaderBoard};
+enum class GameState {Game, Menu, LeaderBoard, Paused};
 GameState state = GameState::Menu;
 
 std::vector<int> loadBestScores() {
@@ -21,17 +21,14 @@ std::vector<int> loadBestScores() {
         scores.push_back(value);
     }
 
-    // Сортируем по убыванию (чтобы первые элементы были наибольшими)
     std::sort(scores.begin(), scores.end(), std::greater<int>());
 
-    // Убедимся, что длина вектора ровно 3 (если меньше — дополним нулями)
     while (scores.size() < 3) scores.push_back(0);
     if (scores.size() > 3) scores.resize(3);
 
     return scores;
 }
 
-// Сохраняет первые 3 значения из scores в файл (каждое значение — с новой строки)
 void saveBestScores(const std::vector<int>& scores) {
     std::ofstream file("save.txt", std::ios::trunc);
     for (size_t i = 0; i < scores.size() && i < 3; ++i) {
@@ -50,6 +47,18 @@ void static showScore(int& score, Text& scoreText) {
     scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
 }
 
+//void printText(String& text,
+//    Text& name,
+//    Font& MyFont,
+//    int& size,
+//    int& posX,
+//    int& posY) {
+//
+//    Text name(text, MyFont, size);
+//    name.setFillColor(Color::White);
+//    name.setPosition(posX, posY);
+//
+//}
 void static resetGame(Sprite& ship,
     std::vector<Sprite>& asteroids,
     Clock& spawnClock,
@@ -159,6 +168,7 @@ int main() {
     startText.setFillColor(Color::White);
     startText.setPosition(350, 200);
 
+
     Text exitText("EXIT", MyFont, 40);
     exitText.setFillColor(Color::White);
     exitText.setPosition(360, 400);
@@ -171,6 +181,19 @@ int main() {
     exitFromLeaderBoard.setFillColor(Color::White);
     exitFromLeaderBoard.setPosition(750, 570);
 
+
+    Text pauseTextPaused("PAUSED", MyFont, 48);
+    pauseTextPaused.setFillColor(Color::Red);
+    FloatRect tb = pauseTextPaused.getLocalBounds();
+    pauseTextPaused.setPosition(WINDOW_WIDTH / 2.f - tb.width / 2.f, WINDOW_HEIGHT / 2.f - tb.height / 2.f);
+
+    Text pauseTextExit("Exit", MyFont, 48);
+    pauseTextExit.setFillColor(Color::Red);
+    FloatRect ht = pauseTextExit.getGlobalBounds();
+    pauseTextExit.setPosition(
+        WINDOW_WIDTH / 2.f - ht.width / 2.f,
+        (WINDOW_HEIGHT / 2.f - tb.height / 2.f) + tb.height + 20.f
+    );
 
     Sprite background(BackgroundTexture);
     background.setScale(
@@ -224,6 +247,22 @@ int main() {
                     state = GameState::Menu;
                 }
             }
+
+            if (state == GameState::Game && e.type == Event::KeyPressed && e.key.code == Keyboard::Escape) {
+                state = GameState::Paused;
+            }
+
+            else if (state == GameState::Paused && e.type == Event::KeyPressed && e.key.code == Keyboard::Escape) {
+                state = GameState::Game;
+            }
+
+            if (state == GameState::Paused && e.type == Event::MouseButtonPressed) {
+                Vector2i mousePos = Mouse::getPosition(window);
+
+                if (pauseTextExit.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
+                    state = GameState::Menu;
+                }
+            }
         }
 
         window.clear(Color::Black);
@@ -235,11 +274,12 @@ int main() {
         }
 
         else if (state == GameState::LeaderBoard) {
+            std::vector<sf::Text> leaderboardTexts;
             for (int i = 0; i < 3; ++i) {
-                Text t(std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
-                t.setFillColor(Color::Yellow);
+                sf::Text t(" " + std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
+                t.setFillColor(sf::Color::Yellow);
                 t.setPosition(10.f, 10.f + i * 40.f);
-                window.draw(t);
+                leaderboardTexts.push_back(t);
             }
             window.draw(exitFromLeaderBoard);
         }
@@ -384,12 +424,11 @@ int main() {
         }
 
         else if (state == GameState::LeaderBoard) {
-            std::vector<sf::Text> leaderboardTexts;
             for (int i = 0; i < 3; ++i) {
-                sf::Text t(" " + std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
-                t.setFillColor(sf::Color::Yellow);
+                Text t(std::to_string(i + 1) + ". " + std::to_string(bestScores[i]), MyFont, 28);
+                t.setFillColor(Color::Yellow);
                 t.setPosition(10.f, 10.f + i * 40.f);
-                leaderboardTexts.push_back(t);
+                window.draw(t);
             }
             window.draw(exitFromLeaderBoard);
         }
@@ -408,6 +447,18 @@ int main() {
                 overText.setPosition(WINDOW_WIDTH / 2.f - tb.width / 2.f, WINDOW_HEIGHT / 2.f - tb.height / 2.f);
                 window.draw(overText);
             }
+        }
+
+        else if (state == GameState::Paused) {
+            window.draw(background);
+            window.draw(ship);
+            window.draw(scoreText);
+            window.draw(petrolText);
+            for (auto& a : asteroids) window.draw(a);
+            for (auto& c : conisters) window.draw(c);
+
+            window.draw(pauseTextPaused);
+            window.draw(pauseTextExit);
         }
 
         window.display();
