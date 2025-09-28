@@ -417,6 +417,7 @@ int main() {
 
 		// Игровой процесс логика
         else if (state == GameState::Game) {
+
             if (!gameOver) {
                 // Управление кораблём
                 if (Keyboard::isKeyPressed(Keyboard::Up)) ship.move(0, -speedShip);
