@@ -51,6 +51,10 @@ void static showScore(int& score, Text& scoreText) {
     scoreText.setPosition(800.f - textBounds.width - 10.f, 10.f);
 }
 
+void updateText(Text& text, const std::string& label, int value, float x, float y) {
+    text.setString(label + ": " + std::to_string(value));
+    text.setPosition(x, y);
+}
 // Создание спрайта с центровкой и масштабированием(Жаль что я сначала пишу потом думаю)
 //Sprite createSprite(const Texture& texture, float scale, float posX, float posY) {
 //    Sprite s(texture);                     
@@ -61,46 +65,69 @@ void static showScore(int& score, Text& scoreText) {
 //    return s;                               
 //}
 
-// Создание текста ( жаль я только щас допёр что так можно(((( )
-//Text createText(const std::string& str, Font& font, unsigned int size, Color color, float x, float y) {
-//    Text t(str, font, size);
-//    t.setFillColor(color);
-//    t.setPosition(x, y);
-//    return t;
-//}
+//Создание текста ( жаль я только щас допёр что так можно(((( )
+Text createText(const std::string& str, Font& font, unsigned int size, Color color, float x, float y) {
+    Text t(str, font, size);
+    t.setFillColor(color);
+    t.setPosition(x, y);
+    return t;
+}
 
 // Сброс игры
-void static resetGame(Sprite& ship,
-    std::vector<Sprite>& asteroids,
-    Clock& spawnClock,
-    Clock& timeSpawnAsteroidClock,
-    Clock& timeScore,
-    const Texture& ShipTexture,
+void resetGame(
+    sf::Sprite& ship,
+    std::vector<sf::Sprite>& asteroids,
+    std::vector<sf::Sprite>& conisters,
+    std::vector<sf::Sprite>& bullets,
+    sf::Clock& spawnClock,
+    sf::Clock& timeSpawnAsteroidClock,
+    sf::Clock& timeScore,
     int& score,
-    Text& scoreText,
+    sf::Text& scoreText,
     float& speed,
-    Clock& timeSpawnPetrol,
+    sf::Clock& timeSpawnPetrol,
     float& timeSpawnAsteroid,
     int& petrol,
-    Text& petrolText,
-    Clock& timeDecreasePetrol) {
-
+    sf::Text& petrolText,
+    sf::Clock& timeDecreasePetrol,
+    float& intTimeSpawnBullet,
+    float& intTimeDecreasePetrol,
+    int& numberBullet,
+    sf::Text& bulletText
+) {
+    // позиция корабля
     ship.setPosition(400.f, 300.f);
+
+    // очистка контейнеров
     asteroids.clear();
+    conisters.clear();
+    bullets.clear();
+
+    // перезапуск часов
     spawnClock.restart();
     timeSpawnAsteroidClock.restart();
     timeScore.restart();
-    score = 0;
-    speed = 5.f;
     timeSpawnPetrol.restart();
-    timeSpawnAsteroid = 1.f;
-    petrol = 100;
     timeDecreasePetrol.restart();
 
+    // восстановление значений
+    score = 0;
+    speed = 5.f;
+    timeSpawnAsteroid = 1.f;
+    petrol = 100;
+    intTimeSpawnBullet = 5.f;
+    intTimeDecreasePetrol = 1.f;
+    numberBullet = 5;
+
+    // обновляем тексты
     showScore(score, scoreText);
     showPetrol(petrol, petrolText);
 
+    // обновляем текст пуль и выставляем его под petrolText
+    FloatRect boundsPetrol = petrolText.getGlobalBounds();
+    updateText(bulletText, "Bullet", numberBullet, 10.f, boundsPetrol.top + boundsPetrol.height + 10.f);
 }
+
 
 
 int main() {
@@ -108,7 +135,7 @@ int main() {
 
 	// Создание окна
     const int WINDOW_WIDTH = 800, WINDOW_HEIGHT = 600;
-    int score = 0, petrol = 100;
+    int score = 0, petrol = 100, numberBullet = 5;
     std::vector<int> bestScores = loadBestScores();
     RenderWindow window(VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Star Way");
     window.setFramerateLimit(60);
@@ -141,6 +168,12 @@ int main() {
         return -1;
     }
 
+    Texture BulletTexture;
+    if (!BulletTexture.loadFromFile("image/bullet.png")) {
+        MessageBox(NULL, L"Не удалось загрузить картинку пули!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return -1;
+    }
+
 	// Загрузка шрифта
     Font MyFont;
     if (!MyFont.loadFromFile("font/myfont.ttf")) {
@@ -151,7 +184,6 @@ int main() {
 	// Загрузка звуков
     SoundBuffer SoundPetrolBuff;
     Sound SoundPetrol;
-
     if (!SoundPetrolBuff.loadFromFile("sound/petrol.wav")) {
         MessageBox(NULL, L"Не удалось загрузить звук конистры!", L"Ошибка", MB_OK | MB_ICONERROR);
         return -1;
@@ -164,6 +196,14 @@ int main() {
         return -1;
     }
 
+    SoundBuffer SoundConflictBuff;
+    Sound SoundConflict;
+    if (!SoundConflictBuff.loadFromFile("sound/conflict.wav")) {
+        MessageBox(NULL, L"Не удалось загрузить звук астероида!", L"Ошибка", MB_OK | MB_ICONERROR);
+        return -1;
+    }
+
+    SoundConflict.setBuffer(SoundConflictBuff);
     SoundAsteroid.setBuffer(SoundAsteroidBuff);
     SoundPetrol.setBuffer(SoundPetrolBuff);
 
@@ -197,7 +237,6 @@ int main() {
     exitFromLeaderBoard.setFillColor(Color::White);
     exitFromLeaderBoard.setPosition(750, 570);
 
-
     Text pauseTextPaused("PAUSED", MyFont, 48);
     pauseTextPaused.setFillColor(Color::Red);
     FloatRect tb = pauseTextPaused.getLocalBounds();
@@ -211,6 +250,9 @@ int main() {
         (WINDOW_HEIGHT / 2.f - tb.height / 2.f) + tb.height + 20.f
     );
 
+    FloatRect boundsPetrol = petrolText.getGlobalBounds();
+    Text bulletText = createText("Bullet: 5", MyFont, 20, Color::Yellow, 10.f, boundsPetrol.top + boundsPetrol.height + 5.f);
+
 	// Создание спрайтов
     Sprite background(BackgroundTexture);
     background.setScale(
@@ -222,14 +264,17 @@ int main() {
     ship.setScale(0.2f, 0.2f);
     ship.setOrigin(ShipTexture.getSize().x / 2.f, ShipTexture.getSize().y / 2.f);
     ship.setPosition(400.f, 300.f);
+
    
 
-    float speedShip = 5.f, speed = 5.f, scalePetrol = 0.1f;
+    float speedShip = 5.f, speed = 5.f, scalePetrol = 0.1f, scaleBullet = 0.5f, speedBullet = 10.f;
     std::vector<Sprite> asteroids;
     std::vector<Sprite> conisters;
-    Clock spawnClock, timeSpawnAsteroidClock, timeScore, timeSpawnPetrol, timeDecreasePetrol;
-    float timeSpawnAsteroid = 1.f;
+    std::vector<Sprite> bullets;
+    Clock spawnClock, timeSpawnAsteroidClock, timeScore, timeSpawnPetrol, timeDecreasePetrol, timeSpawnBullet;
+    float timeSpawnAsteroid = 1.f, intTimeSpawnBullet = 5.f, intTimeDecreasePetrol = 1.f;
     bool gameOver = false, showMessage = false;
+    std::string inputBuffer;
 
 	// Главный цикл
     while (window.isOpen()) {
@@ -239,15 +284,56 @@ int main() {
                 window.close();
             }
 
+            if (e.type == Event::TextEntered) {
+                if (e.text.unicode == '\b') {
+
+                    if (!inputBuffer.empty())
+                        inputBuffer.pop_back();
+                }
+                else if (e.text.unicode < 128) {
+                    inputBuffer += static_cast<char>(e.text.unicode);
+                }
+
+                if (inputBuffer.find("bullinf") != std::string::npos) {
+                    intTimeSpawnBullet = 0.f; 
+
+                    inputBuffer.clear();
+                }
+
+                if (inputBuffer.find("petrolinf") != std::string::npos) {
+                    intTimeDecreasePetrol = 0.f;
+
+                    inputBuffer.clear();
+                }
+            }
 			// Menu mouse events
             if (state == GameState::Menu && e.type == Event::MouseButtonPressed) {
                 Vector2i mousePos = Mouse::getPosition(window);
 
                 if (startText.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
                     state = GameState::Game;
-                    resetGame(ship, asteroids, spawnClock, timeSpawnAsteroidClock,
-                        timeScore, ShipTexture, score, scoreText, speed,
-                        timeSpawnPetrol, timeSpawnAsteroid, petrol, petrolText, timeDecreasePetrol);
+                    resetGame(
+                        ship,
+                        asteroids,
+                        conisters,
+                        bullets,
+                        spawnClock,
+                        timeSpawnAsteroidClock,
+                        timeScore,
+                        score,
+                        scoreText,
+                        speed,
+                        timeSpawnPetrol,
+                        timeSpawnAsteroid,
+                        petrol,
+                        petrolText,
+                        timeDecreasePetrol,
+                        intTimeSpawnBullet,
+                        intTimeDecreasePetrol,
+                        numberBullet,
+                        bulletText
+                    );
+
                     gameOver = false;
                     showMessage = false;
                 }
@@ -284,6 +370,24 @@ int main() {
 
                 if (pauseTextExit.getGlobalBounds().contains(mousePos.x, mousePos.y)) {
                     state = GameState::Menu;
+                }
+            }
+            
+            if (state == GameState::Game && e.type == Event::KeyPressed && e.key.code == Keyboard::Space) {
+
+                if (numberBullet > 0) {
+                    Sprite bull(BulletTexture);
+
+                    bull.setScale(scaleBullet, scaleBullet);
+                    FloatRect localBounds = bull.getLocalBounds();
+                    bull.setOrigin(localBounds.width, localBounds.height / 2.f);
+
+                    Vector2f shipPos = ship.getPosition();
+                    FloatRect shipBounds = ship.getGlobalBounds();
+                    bull.setPosition(shipPos.x + shipBounds.width / 2.f, shipPos.y);
+
+                    bullets.push_back(bull);
+                    numberBullet--;
                 }
             }
         }
@@ -402,13 +506,56 @@ int main() {
                 for (auto it = conisters.begin(); it != conisters.end();) {
                     if (ship.getGlobalBounds().intersects(it->getGlobalBounds())) {
                         it = conisters.erase(it);
-                        petrol += 25;
+                        petrol += 22;
                         showPetrol(petrol, petrolText);
                         SoundPetrol.play();
                     }
                     else {
                         ++it;
                     }
+                }
+
+
+
+                // Движение пуль
+                for (auto& a : bullets) {
+                    a.move(speedBullet, 0);
+                }
+
+                // Удаление пуль
+                bullets.erase(
+                    std::remove_if(bullets.begin(), bullets.end(),
+                        [](const Sprite& a) { return a.getPosition().x > WINDOW_WIDTH; }),
+                    bullets.end()
+                );
+
+                // Столкновение пуль и астероидов
+                for (auto it = bullets.begin(); it != bullets.end();) {
+                    bool BulledErasted = false;
+
+                    for (auto ait = asteroids.begin(); ait != asteroids.end();) {
+                        if (it->getGlobalBounds().intersects(ait->getGlobalBounds())) {
+
+                            ait = asteroids.erase(ait);
+                            it = bullets.erase(it);
+                            SoundConflict.play();
+                            updateText(bulletText, "Bullet", numberBullet, 10.f, boundsPetrol.top + boundsPetrol.height + 10.f);
+                            BulledErasted = true;
+                        }
+                        else {
+                            ++ait;
+                        }
+                    }
+                    if (!BulledErasted) {
+                        ++it;
+                    }
+                }
+
+                // Cпавн пуль
+                if (timeSpawnBullet.getElapsedTime().asSeconds() > intTimeSpawnBullet) {
+                    numberBullet += 1;
+                    updateText(bulletText, "Bullet", numberBullet, 10.f, boundsPetrol.top + boundsPetrol.height + 10.f);
+                    timeSpawnBullet.restart();
                 }
 
 				// Обновление позиции счёта
@@ -427,7 +574,7 @@ int main() {
 
 				// Отображение топлива и уменьшение его
                 petrolText.setPosition(10.f, 10.f);
-                if (timeDecreasePetrol.getElapsedTime().asSeconds() > 1.f) {
+                if (timeDecreasePetrol.getElapsedTime().asSeconds() > intTimeDecreasePetrol) {
                     if (petrol > 0) {
                         petrol -= 4;
                         showPetrol(petrol, petrolText);
@@ -437,6 +584,8 @@ int main() {
                         gameOver = true;
                     }
                 }
+
+                
             }
         }
 
@@ -464,8 +613,10 @@ int main() {
             window.draw(ship);
             window.draw(scoreText);
             window.draw(petrolText);
+            window.draw(bulletText);
             for (auto& a : asteroids) window.draw(a);
             for (auto& c : conisters) window.draw(c);
+            for (auto& j : bullets) window.draw(j);
             if (gameOver) {
                 Text overText("GAME OVER", MyFont, 48);
                 overText.setFillColor(Color::Red);
@@ -501,15 +652,17 @@ int main() {
 
             saveBestScores(bestScores);
 
-            std::wstring msg = L"Вы столкнулись!\nСчёт: " + std::to_wstring(score) + L"\nНачать заново?";
+            std::wstring msg = L"Вы проиграли!\nСчёт: " + std::to_wstring(score) + L"\nНачать заново?";
             int result = MessageBox(NULL, msg.c_str(), L"Game Over", MB_OKCANCEL | MB_ICONEXCLAMATION);
             if (result == IDOK) {
-                resetGame(ship,
+                resetGame(
+                    ship,
                     asteroids,
+                    conisters,
+                    bullets,
                     spawnClock,
                     timeSpawnAsteroidClock,
                     timeScore,
-                    ShipTexture,
                     score,
                     scoreText,
                     speed,
@@ -517,7 +670,14 @@ int main() {
                     timeSpawnAsteroid,
                     petrol,
                     petrolText,
-                    timeDecreasePetrol);
+                    timeDecreasePetrol,
+                    intTimeSpawnBullet,
+                    intTimeDecreasePetrol,
+                    numberBullet,
+                    bulletText
+                );
+
+
                 gameOver = false;
                 showMessage = false;
             }
